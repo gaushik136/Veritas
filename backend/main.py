@@ -1,10 +1,10 @@
 """VERITAS - Verification and Evidence-based Real-time Information Trust Assessment System.
 
-FastAPI backend providing news analysis via Gemini and ML classification.
+FastAPI backend providing news analysis via Gemini, ML classification, and article extraction.
 """
 from __future__ import annotations
 import os
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from email import policy
 from email.parser import BytesParser
 from typing import Any
@@ -13,7 +13,8 @@ import re
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.concurrency import run_in_threadpool
 
@@ -25,14 +26,14 @@ from src.services.gemini_service import GeminiServiceError, GeminiAnalysisResult
 # Ensure environment is loaded on import
 _load_env_fallback()
 
-DEVELOPMENT_ORIGINS = (
+DEVELOPMENT_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:4173",
     "http://127.0.0.1:4173",
-)
+]
 MAX_MULTIPART_BYTES = MAX_UPLOAD_BYTES + 64 * 1024
 MAX_TEXT_REQUEST_BYTES = 48 * 1024
 
@@ -82,12 +83,23 @@ def create_app(engine_provider=get_default_engine) -> FastAPI:
     )
     app.state.engine_provider = engine_provider
 
+    # Build CORS origins list
+    allowed_origins = list(DEVELOPMENT_ORIGINS)
+    custom_origins = os.environ.get("ALLOWED_ORIGINS", "")
+    if custom_origins:
+        if custom_origins.strip() == "*":
+            allowed_origins = ["*"]
+        else:
+            allowed_origins.extend([o.strip() for o in custom_origins.split(",") if o.strip()])
+
+    # If in cloud/production and no specific restriction, allow credentials-safe wildcards or render.com subdomains
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=list(DEVELOPMENT_ORIGINS),
-        allow_credentials=False,
+        allow_origins=allowed_origins if allowed_origins != ["*"] else ["*"],
+        allow_origin_regex=r"https://.*\.onrender\.com" if allowed_origins != ["*"] else None,
+        allow_credentials=True if allowed_origins != ["*"] else False,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type"],
+        allow_headers=["*"],
     )
 
     @app.exception_handler(RequestValidationError)
@@ -138,8 +150,8 @@ def create_app(engine_provider=get_default_engine) -> FastAPI:
             result = await run_in_threadpool(analyze_news_text, payload.text)
         except GeminiServiceError as exc:
             return _err(exc.code, str(exc), exc.status_code)
-        except Exception:
-            return _err("analysis_error", "Text analysis could not be completed.", 500)
+        except Exception as exc:
+            return _err("analysis_error", f"Text analysis could not be completed: {str(exc)[:100]}", 500)
         return result.model_dump()
 
     @app.post("/api/v1/predict")
@@ -242,6 +254,27 @@ def create_app(engine_provider=get_default_engine) -> FastAPI:
             "warnings": result.warnings,
         }
 
+    # Optional Unified Deployment: Mount React Frontend Build if present
+    frontend_dist_candidates = [
+        Path(__file__).resolve().parent.parent / "frontend" / "dist",
+        Path.cwd() / "frontend" / "dist",
+        Path.cwd() / "dist",
+    ]
+    dist_path = next((p for p in frontend_dist_candidates if p.is_dir()), None)
+    if dist_path:
+        assets_dir = dist_path / "assets"
+        if assets_dir.is_dir():
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+        @app.get("/{full_path:path}")
+        async def serve_spa(full_path: str):
+            if full_path.startswith("api/") or full_path in ("health", "ready"):
+                return JSONResponse(status_code=404, content={"error": "not_found"})
+            file_candidate = dist_path / full_path
+            if file_candidate.is_file():
+                return FileResponse(file_candidate)
+            return FileResponse(dist_path / "index.html")
+
     return app
 
 
@@ -249,13 +282,6 @@ app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
-    # Load .env if present
-    env_path = os.path.join(os.path.dirname(__file__), ".env")
-    if os.path.exists(env_path):
-        with open(env_path) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    os.environ.setdefault(k.strip(), v.strip())
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    port = int(os.environ.get("PORT", "8000"))
+    host = os.environ.get("HOST", "0.0.0.0")
+    uvicorn.run("main:app", host=host, port=port, reload=False)
