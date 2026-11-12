@@ -2,16 +2,12 @@
 # Docs: https://render.com/docs/blueprint-spec
 
 services:
-  # ---------------------------------------------------------------------------
-  # OPTION A: Fullstack Unified Web Service (Backend + Embedded Frontend SPA)
-  # Free-tier friendly (uses only 1 single Render instance)
-  # ---------------------------------------------------------------------------
   - type: web
     name: veritas-app
     runtime: python
     region: oregon
     plan: free
-    buildCommand: "cd frontend && npm install && chmod -R +x node_modules/.bin 2>/dev/null || true && npm run build && cd ../backend && pip install -r requirements.txt"
+    buildCommand: "pip install -r backend/requirements.txt"
     startCommand: "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /health
     envVars:
@@ -21,5 +17,3 @@ services:
         value: gemini
       - key: PYTHON_VERSION
         value: 3.11.9
-      - key: NODE_VERSION
-        value: 20.12.0
