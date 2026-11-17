@@ -22,6 +22,7 @@ from src.inference.engine import InferenceEngine, InferenceInputError, get_defau
 from src.input_processing.image_ocr import ImageOCRError, MAX_UPLOAD_BYTES, extract_image
 from src.input_processing.url_extractor import URLExtractionError, extract_article
 from src.services.gemini_service import GeminiServiceError, GeminiAnalysisResult, analyze_news_text, _load_env_fallback
+from src.services.ai_detection_service import detect_ai_content
 
 # Ensure environment is loaded on import
 _load_env_fallback()
@@ -152,6 +153,26 @@ def create_app(engine_provider=get_default_engine) -> FastAPI:
             return _err(exc.code, str(exc), exc.status_code)
         except Exception as exc:
             return _err("analysis_error", f"Text analysis could not be completed: {str(exc)[:100]}", 500)
+        return result.model_dump()
+
+    @app.post("/api/v1/detect-ai")
+    async def detect_ai_route(request: Request) -> Any:
+        if "application/json" not in (request.headers.get("content-type") or "").lower():
+            return _err("invalid_content_type", "Send a JSON body with a 'text' field.", 415)
+        try:
+            raw = await _read_limited(request, MAX_TEXT_REQUEST_BYTES)
+        except ValueError:
+            return _err("request_too_large", "Request exceeds size limit.", 413)
+        try:
+            payload = AnalyzeTextRequest.model_validate_json(raw)
+        except ValidationError as exc:
+            too_long = any(e.get("type") == "string_too_long" for e in exc.errors())
+            return _err("text_too_long" if too_long else "invalid_text",
+                        "Text must be non-empty and ≤10,000 characters.", 413 if too_long else 422)
+        try:
+            result = await run_in_threadpool(detect_ai_content, payload.text)
+        except Exception as exc:
+            return _err("detection_error", f"AI detection could not be completed: {str(exc)[:100]}", 500)
         return result.model_dump()
 
     @app.post("/api/v1/predict")

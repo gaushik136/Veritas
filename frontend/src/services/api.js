@@ -76,6 +76,14 @@ export async function checkReady() {
   return request('/ready');
 }
 
+/** POST /api/v1/detect-ai — AI vs human origin detection */
+export async function detectAI(text) {
+  return request('/api/v1/detect-ai', {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  });
+}
+
 /** GET /health — Liveness ping */
 export async function checkHealth() {
   return request('/health');

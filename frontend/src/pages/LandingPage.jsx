@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { analyzeText, extractUrl, extractImage, predict } from '../services/api.js'
+import { analyzeText, extractUrl, extractImage, predict, detectAI } from '../services/api.js'
 import { saveAnalysis, getHistory } from '../services/history.js'
 import Notice from '../components/Notice.jsx'
 import VerdictBadge from '../components/VerdictBadge.jsx'
@@ -46,7 +46,7 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [dragOver, setDragOver] = useState(false)
-  const [activeStep, setActiveStep] = useState(null) // 'extract' | 'gemini' | 'ml' | 'report'
+  const [activeStep, setActiveStep] = useState(null) // 'extract' | 'gemini' | 'ai_detect' | 'ml' | 'report'
   const fileRef = useRef()
   const history = getHistory().slice(0, 5)
 
@@ -124,7 +124,23 @@ export default function LandingPage() {
         geminiError = { code: err.code, message: err.message }
       }
 
-      // Step 3: ML Classifiers
+      // Step 3: AI Origin Detection (runs in parallel with ML)
+      setActiveStep('ai_detect')
+      let aiDetectionResult = null
+      try {
+        aiDetectionResult = await detectAI(inputText)
+      } catch (err) {
+        // graceful fallback — uncertain result
+        aiDetectionResult = {
+          verdict: 'uncertain',
+          ai_probability: 0.5,
+          confidence: 0.0,
+          indicators: ['Detection unavailable'],
+          explanation: 'AI origin detection could not be completed at this time.',
+        }
+      }
+
+      // Step 4: ML Classifiers
       setActiveStep('ml')
       const mlResults = {}
       const mlErrors = {}
@@ -139,13 +155,14 @@ export default function LandingPage() {
         })
       )
 
-      // Step 4: Compiling Report & Navigation
+      // Step 5: Compiling Report & Navigation
       setActiveStep('report')
       const id = saveAnalysis({
         ...inputMeta,
         inputType: tab,
         gemini: geminiResult,
         ml: mlResults,
+        ai_detection: aiDetectionResult,
         errors: { gemini: geminiError, ml: mlErrors },
       })
 
@@ -181,8 +198,14 @@ export default function LandingPage() {
     {
       id: 'gemini',
       label: 'Gemini Fact-Checking Analysis',
-      status: activeStep === 'gemini' ? 'running' : ['ml', 'report'].includes(activeStep) ? 'done' : 'pending',
+      status: activeStep === 'gemini' ? 'running' : ['ai_detect', 'ml', 'report'].includes(activeStep) ? 'done' : 'pending',
       note: activeStep === 'gemini' ? 'Extracting verifiable claims & source evidence…' : null,
+    },
+    {
+      id: 'ai_detect',
+      label: 'AI vs. Human Origin Detection',
+      status: activeStep === 'ai_detect' ? 'running' : ['ml', 'report'].includes(activeStep) ? 'done' : 'pending',
+      note: activeStep === 'ai_detect' ? 'Analyzing linguistic patterns, perplexity & style…' : null,
     },
     {
       id: 'ml',

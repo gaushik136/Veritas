@@ -5,6 +5,7 @@ import CredibilityMeter from '../components/CredibilityMeter.jsx'
 import VerdictBadge from '../components/VerdictBadge.jsx'
 import ClaimCard from '../components/ClaimCard.jsx'
 import SourceCard from '../components/SourceCard.jsx'
+import AIDetectionCard from '../components/AIDetectionCard.jsx'
 import Notice from '../components/Notice.jsx'
 
 const ML_TASK_LABELS = {
@@ -54,13 +55,14 @@ export default function ResultsPage() {
     )
   }
 
-  const { gemini, ml, errors, inputType, inputPreview, timestamp } = analysis
+  const { gemini, ml, ai_detection, errors, inputType, inputPreview, timestamp } = analysis
   const geminiError = errors?.gemini
   const hasGemini = !!gemini
   const hasAnyClaim = hasGemini && gemini.claims?.length > 0
   const hasAnySource = hasGemini && gemini.sources?.length > 0
   const mlTaskKeys = Object.keys(ml || {})
   const hasML = mlTaskKeys.length > 0
+  const hasAIDetection = !!ai_detection
 
   function handleExport() {
     const lines = [
@@ -72,6 +74,8 @@ export default function ResultsPage() {
       `## Credibility Score: ${gemini?.credibility_score != null ? Math.round(gemini.credibility_score * 100) + '/100' : 'N/A'}`,
       '',
       gemini?.summary ? `## Executive Fact-Check Summary\n${gemini.summary}` : '',
+      '',
+      hasAIDetection ? `## AI vs. Human Origin Detection\n- Verdict: ${ai_detection.verdict?.toUpperCase()}\n- AI Probability: ${Math.round((ai_detection.ai_probability ?? 0.5) * 100)}%\n- Confidence: ${Math.round((ai_detection.confidence ?? 0) * 100)}%\n- Explanation: ${ai_detection.explanation || 'N/A'}\n- Indicators: ${(ai_detection.indicators || []).join(', ')}` : '',
       '',
       hasAnyClaim ? `## Extracted Claims & Verification\n${gemini.claims.map(c => `- [${c.verdict.toUpperCase()}] "${c.text}" (Confidence: ${Math.round(c.confidence * 100)}%)\n  *Explanation:* ${c.explanation}\n  ${c.why_fake && c.why_fake !== 'N/A: Verified factual' ? `*Why Fake:* ${c.why_fake}\n  ` : ''}${c.evidence ? `*Evidence:* ${c.evidence}` : ''}`).join('\n\n')}` : '',
       '',
@@ -156,6 +160,16 @@ export default function ResultsPage() {
             </div>
           </div>
         </div>
+
+        {/* AI Origin Detection */}
+        {hasAIDetection && (
+          <section aria-labelledby="ai-detect-heading" style={{ marginBottom: 32 }}>
+            <div className="section-title" id="ai-detect-heading">
+              AI vs. Human Origin Analysis
+            </div>
+            <AIDetectionCard result={ai_detection} />
+          </section>
+        )}
 
         {/* Claims & Why It's Fake with Evidence */}
         <section aria-labelledby="claims-heading">

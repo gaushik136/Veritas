@@ -15,6 +15,7 @@ export function saveAnalysis(entry) {
     language: entry.gemini?.language ?? 'en',
     gemini: entry.gemini ?? null,
     ml: entry.ml ?? null,
+    ai_detection: entry.ai_detection ?? null,
     errors: entry.errors ?? {},
   };
   const updated = [item, ...history].slice(0, MAX_ITEMS);
