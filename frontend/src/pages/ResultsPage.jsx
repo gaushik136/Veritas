@@ -6,6 +6,7 @@ import VerdictBadge from '../components/VerdictBadge.jsx'
 import ClaimCard from '../components/ClaimCard.jsx'
 import SourceCard from '../components/SourceCard.jsx'
 import AIDetectionCard from '../components/AIDetectionCard.jsx'
+import AnalysisGraphs from '../components/AnalysisGraphs.jsx'
 import Notice from '../components/Notice.jsx'
 
 const ML_TASK_LABELS = {
@@ -161,6 +162,9 @@ export default function ResultsPage() {
           </div>
         </div>
 
+        {/* Visual Process & Analytics Graphs */}
+        <AnalysisGraphs gemini={gemini} aiDetection={ai_detection} />
+
         {/* AI Origin Detection */}
         {hasAIDetection && (
           <section aria-labelledby="ai-detect-heading" style={{ marginBottom: 32 }}>
@@ -281,11 +285,6 @@ export default function ResultsPage() {
             {inputPreview || '(no preview)'}
           </div>
         </section>
-
-        {/* Footer note */}
-        <div style={{ marginTop: 48, paddingTop: 24, borderTop: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--text-disabled)', textAlign: 'center', lineHeight: 1.6 }}>
-          VERITAS Fact-Checking Engine · Evidence retrieved directly via real-time verification and official reference sources.
-        </div>
       </div>
     </div>
   )

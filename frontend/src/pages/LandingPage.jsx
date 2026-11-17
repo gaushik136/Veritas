@@ -14,17 +14,6 @@ const TABS = [
 
 const ML_TASKS = ['fever_claim', 'liar_statement', 'tamil_xfact']
 
-const SAMPLE_TEXTS = [
-  {
-    label: 'NASA Galaxy (Real)',
-    text: 'WASHINGTON (Reuters) - NASA said on Wednesday that the James Webb Space Telescope has discovered GLASS-z12, one of the oldest galaxies ever seen, dating to approximately 350 million years after the Big Bang.',
-  },
-  {
-    label: 'Miracle Cure (Fake)',
-    text: 'BREAKING: Drinking 500ml of boiled lemon water with honey cures stage 4 lung cancer in 48 hours according to a secret hospital study.',
-  },
-]
-
 const SAMPLE_URLS = [
   {
     label: 'JWST Wikipedia Article',
@@ -301,20 +290,6 @@ export default function LandingPage() {
                       maxLength={10000}
                       aria-label="News text to analyze"
                     />
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '12px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>Try Example:</span>
-                      {SAMPLE_TEXTS.map((sample, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          className="btn btn--ghost btn--sm"
-                          style={{ fontSize: '0.75rem', padding: '4px 10px' }}
-                          onClick={() => { setText(sample.text); setError(null) }}
-                        >
-                          {sample.label}
-                        </button>
-                      ))}
-                    </div>
                   </>
                 )}
 
